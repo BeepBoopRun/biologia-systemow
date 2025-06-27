@@ -1,0 +1,726 @@
+---
+title: "Portrety fazowe"
+author: "Kinga Kurowska, Wiktor Rorat"
+format: 
+  html:
+      df-print: paged
+# print df as tables https://quarto.org/docs/computations/r.html#data-frames
+      tidy: false
+      embed-resources: true
+      theme: lumen
+      toc: true
+      toc-location: left
+      toc-depth: 6
+      toc-expand: 6
+      code-tools:
+          source: true
+          toggle: true
+      code-fold: false
+      code-summary: "Show the code"
+      code-overflow: wrap
+      page-layout: full
+editor: visual
+---
+
+## Portrety fazowe
+
+```{r}
+library(deSolve)
+library(phaseR)
+```
+
+### Zadanie 1 - jaka faza, taki portret
+
+a\) $${ds_1\over dt}={k_1\over 1+ ({s_2\over K})^n}-k_3s_1-k_5s_1$$
+
+$$
+{ds_2\over dt}=k_2+k_5s_1-k_4s_2
+$$
+
+$$
+s_1(s_2) = \displaystyle \frac{k_1}{(k_3 + k_5)\left(1 + \left(\frac{s_2}{K}\right)^n\right)}
+$$
+
+$$
+s_2(s_1) = \displaystyle \frac{k_2 + k_5 s_1}{k_4}
+$$​​
+
+b\)
+
+Jednostki stałych: $k_1: {M\over s};\space k_2: {M\over s};\space k_3, k_4, k_5: {1 \over s}$
+
+```{r}
+zad1 <- function(t, y, parameters) {
+  #parameters
+   k1 <- parameters[1]
+   k2 <- parameters[2]
+   k3 <- parameters[3]
+   k4 <- parameters[4]
+   k5 <- parameters[5]
+   K  <- parameters[6]
+   n  <- parameters[7]
+
+  #variables
+  s1     <- y[1]
+  s2     <- y[2]
+
+#equation
+  dy    <- c((k1/(1+(s2/K)^n))-k3*s1-k5*s1,
+             k2+k5*s1-k4*s2)
+  list(dy)
+}
+```
+
+```{r}
+s10=0
+s20=0
+inits1 <- c(s1=s10, s2=s20)
+parameters <- c(k1=20, k2=5, k3=5, k4=5, k5=2, K=1, n=4)
+
+times <- seq(0, 3, by = 0.01)
+out <- as.data.frame(lsoda(inits1, times, zad1, parameters))
+```
+
+```{r}
+plot(out$time, out$s1,
+     t="l",
+     lwd=4,
+     col="royalblue",
+     xlab="Time",
+     ylab="Concentration",
+     ylim=c(0,2),
+     xlim=c(0,3)
+     )
+
+legend(1, 2, legend=c("s1", "s2"),
+       col=c("royalblue", "gold"), lty=c(1,1), cex=0.8,
+       text.font=8)
+
+lines(out$time, out$s2,
+     lwd=4,
+     col="gold"
+     )
+```
+
+c\)
+
+```{r}
+plot(out$s1,out$s2,
+     t="l",
+     lwd=4,
+     col="gold",
+     xlab="s1",
+     ylab="s2",
+     ylim=c(0,2),
+     xlim=c(0,2),
+    )
+invisible(nullclines(zad1,
+          parameters = parameters,
+          xlim    = c(0, 2),
+          ylim    = c(0, 2),
+          state.names = c("s1", "s2")))
+```
+
+d\)
+
+```{r}
+inits2 <- c(s1=1, s2=0)
+inits3 <- c(s1=0, s2=1)
+
+simulation1 <- as.data.frame(lsoda(inits1, times, zad1, parameters))
+simulation2 <- as.data.frame(lsoda(inits2, times, zad1, parameters))
+simulation3 <- as.data.frame(lsoda(inits3, times, zad1, parameters))
+```
+
+```{r}
+plot(simulation1$time, simulation1$s1, type="l", col="magenta", xlab="time", ylab="concentration",lwd=2, ylim = c(0, 2))
+lines(simulation1$time, simulation1$s2, type="l", col="magenta",lwd=2,lty=2)
+
+lines(simulation2$time, simulation2$s1, type="l", col="blue",lwd=2)
+lines(simulation2$time, simulation2$s2, type="l", col="blue",lwd=2,lty=2)
+
+lines(simulation3$time, simulation3$s1, type="l", col="darkgreen",lwd=2)
+lines(simulation3$time, simulation3$s2, type="l", col="darkgreen",lwd=2,lty=2)
+
+
+
+legend(2, 0.5, legend = c("s1", "s2"),
+       col = c("black"), lwd = 1, lty = c(1, 2))
+```
+
+```{r}
+plot(simulation1$s1, simulation1$s2, type="l", col="magenta", xlab="s1", ylab="s2",lwd=2,ylim=c(0,2), xlim=c(0,2))
+lines(simulation2$s1, simulation2$s2, type="l", col="blue",lwd=2)
+lines(simulation3$s1, simulation3$s2, type="l", col="darkgreen",lwd=2)
+```
+
+e\)
+
+```{r}
+invisible(flowField(zad1,
+          parameters = parameters,
+          xlim    = c(0, 2),
+          ylim    = c(0, 2),
+          add     = FALSE,
+          xlab = "s1",
+          ylab = "s2"))
+invisible(nullclines(zad1,
+          parameters = parameters,
+          xlim    = c(0, 2),
+          ylim    = c(0, 2),
+          state.names = c("s1", "s2")))
+```
+
+### Zadanie 2 - wzajemna inhibicja
+
+a\)
+
+$$
+{ds_1\over dt} = {k_1\over 1+ ({s_2\over K_2})^{n_1}}-k_3s_1
+$$
+
+$$
+{ds_2\over dt} = {k_2\over 1+ ({s_1\over K_2})^{n_2}}-k_4s_2
+$$
+
+$$
+s_1(s_2) = \displaystyle \frac{k_1}{k_3 \left(1 + \left(\frac{s_2}{K_2}\right)^{n_1}\right)}
+$$
+
+$$
+s_2(s_1) = \displaystyle \frac{k_2}{k_4 \left(1 + \left(\frac{s_1}{K_2}\right)^{n_2}\right)}
+$$
+
+b\)
+
+Jeśli n1\>n2​, to oznacza, że białko s2​ silniej hamuje produkcję s1​ niż odwrotnie. W takim przypadku nawet niewielki wzrost stężenia s2​ może znacznie obniżyć stężenie s1​. To może prowadzić do sytuacji, w której stężenie s1​ dąży do zera, a s2​ osiąga wyższy poziom.
+
+Jeśli natomiast n1=n2​, to wpływ obu białek jest równie silny. Wtedy układ jest bardziej zrównoważony, a stężenia mogą się ustabilizować na podobnym poziomie lub układ może mieć dwa stabilne punkty – zależnie od innych parametrów i warunków początkowych.
+
+c\)
+
+```{r}
+zad2 <- function(t, y, parameters) {
+  #parameters
+   k1 <- parameters[1]
+   k2 <- parameters[2]
+   k3 <- parameters[3]
+   k4 <- parameters[4]
+   K1  <- parameters[5]
+   n1  <- parameters[6]
+   K2  <- parameters[7]
+   n2  <- parameters[8]
+
+  #variables
+  s1     <- y[1]
+  s2     <- y[2]
+
+#equation
+  dy    <- c((k1/(1+(s2/K1)^n1))-k3*s1,
+             (k2/(1+(s1/K2)^n2))-k4*s2)
+  list(dy)
+}
+```
+
+```{r}
+s10=0
+s20=0
+inits <- c(s1=s10, s2=s20)
+params1 <- c(k1=20, k2=20, k3=5, k4=5, K1=1, n1=4, K2=1, n2=1)
+params2 <- c(k1=20, k2=20, k3=5, k4=5, K1=1, K2=1, n1=4, n2=4)
+
+times <- seq(0, 3, by = 0.01)
+out1 <- as.data.frame(lsoda(inits, times, zad2, params1))
+out2 <- as.data.frame(lsoda(inits, times, zad2, params2))
+```
+
+```{r}
+plot(out1$time, out1$s1,
+     t="l",
+     lwd=4,
+     col="royalblue",
+     main="n1>n2",
+     xlab="Time",
+     ylab="Concentration",
+     ylim=c(0,4),
+     xlim=c(0,3)
+     )
+
+legend(1, 2, legend=c("s1", "s2"),
+       col=c("royalblue", "gold"), lty=c(1,1), cex=0.8,
+       text.font=8)
+
+lines(out1$time, out1$s2,
+     lwd=4,
+     col="gold"
+     )
+
+plot(out2$time, out2$s1,
+     t="l",
+     lwd=4,
+     col="royalblue",
+     main="n1=n2",
+     xlab="Time",
+     ylab="Concentration",
+     ylim=c(0,4),
+     xlim=c(0,3)
+     )
+
+legend(1, 2, legend=c("s1", "s2"),
+       col=c("royalblue", "gold"), lty=c(1,1), cex=0.8,
+       text.font=8)
+
+
+lines(out2$time, out2$s2,
+     lwd=4,
+     col="gold"
+     )
+```
+
+d\)
+
+```{r}
+inits1 <- c(s1 = 0, s2 = 0)
+inits2 <- c(s1 = 0, s2 = 1)
+inits3 <- c(s1 = 1, s2 = 0)
+inits4 <- c(s1 = 1, s2 = 1)
+
+```
+
+```{r}
+simulation1 <- as.data.frame(lsoda(inits1, times, zad2, params1))
+simulation2 <- as.data.frame(lsoda(inits2, times, zad2, params1))
+simulation3 <- as.data.frame(lsoda(inits3, times, zad2, params1))
+simulation4 <- as.data.frame(lsoda(inits4, times, zad2, params1))
+plot(simulation1$time, simulation1$s1, type="l", col="magenta", main="n1>n2", xlab="time", ylab="concentration",lwd=1.5,ylim=c(0,4))
+lines(simulation1$time, simulation1$s2, type="l", col="magenta",lwd=1.5,lty=2)
+
+lines(simulation2$time, simulation2$s1, type="l", col="blue",lwd=1.5)
+lines(simulation2$time, simulation2$s2, type="l", col="blue",lwd=1.5,lty=2)
+
+lines(simulation3$time, simulation3$s1, type="l", col="darkgreen",lwd=1.5)
+lines(simulation3$time, simulation3$s2, type="l", col="darkgreen",lwd=1.5,lty=2)
+
+lines(simulation4$time, simulation4$s1, type="l", col="orange",lwd=1.5)
+lines(simulation4$time, simulation4$s2, type="l", col="orange",lwd=1.5,lty=2)
+
+legend(2, 2, legend = c("s1", "s2"),
+       col = c("black"), lwd = 1, lty = c(1, 2))
+```
+
+```{r}
+simulation1 <- as.data.frame(lsoda(inits1, times, zad2, params2))
+simulation2 <- as.data.frame(lsoda(inits2, times, zad2, params2))
+simulation3 <- as.data.frame(lsoda(inits3, times, zad2, params2))
+simulation4 <- as.data.frame(lsoda(inits4, times, zad2, params2))
+
+
+plot(simulation1$time, simulation1$s1, type="l", col="magenta", main="n1=n2", xlab="time", ylab="concentration",lwd=1.5,ylim=c(0,4))
+lines(simulation1$time, simulation1$s2, type="l", col="magenta",lwd=1.5,lty=2)
+
+lines(simulation2$time, simulation2$s1, type="l", col="blue",lwd=1.5)
+lines(simulation2$time, simulation2$s2, type="l", col="blue",lwd=1.5,lty=2)
+
+lines(simulation3$time, simulation3$s1, type="l", col="darkgreen",lwd=1.5)
+lines(simulation3$time, simulation3$s2, type="l", col="darkgreen",lwd=1.5,lty=2)
+
+lines(simulation4$time, simulation4$s1, type="l", col="orange",lwd=1.5)
+lines(simulation4$time, simulation4$s2, type="l", col="orange",lwd=1.5,lty=2)
+
+legend(2, 3, legend = c("s1", "s2"),
+       col = c("black"), lwd = 1, lty = c(1, 2))
+```
+
+```{r}
+invisible(flowField(zad2,
+          parameters = params1,
+          xlim    = c(0, 6),
+          ylim    = c(0, 6),
+          main = "n1>n2",
+          add     = FALSE,
+          xlab = "s1",
+          ylab = "s2"))
+invisible(nullclines(zad2,
+          parameters = params1,
+          xlim    = c(0, 6),
+          ylim    = c(0, 6),
+          state.names = c("s1", "s2")))
+```
+
+```{r}
+invisible(flowField(zad2,
+          parameters = params2,
+          xlim    = c(0, 8),
+          ylim    = c(0, 8),
+          main = "n1=n2",
+          add     = FALSE,
+          xlab = "s1",
+          ylab = "s2"))
+invisible(nullclines(zad2,
+          parameters = params2,
+          xlim    = c(0, 8),
+          ylim    = c(0, 8),
+          state.names = c("s1", "s2")))
+```
+
+### Zadanie 3 - chemostat
+
+$$
+{d\overline\rho \over d\overline{t}} = \left( \gamma{\overline{c} \over {1 + \overline{c}}}-1 \right)\overline\rho
+$$
+
+$$
+{d\overline{c} \over d\overline{t}} = \overline{c}_{in} - \overline{c} - \gamma{{\overline{c}\overline{\rho}} \over {1 + \overline{c}}}
+$$
+
+```{r}
+zad3 <- function(t, y, parameters) {
+  #parameters
+   cin <- parameters[1]
+   gamma <- parameters[2]
+
+
+  #variables
+  c     <- y[1]
+  p     <- y[2]
+  
+
+#equation
+  dy    <- c(cin-c-gamma*c*p/(1+c),(gamma*c/(1+c)-1)*p)
+  list(dy)
+}
+
+p0=0
+c0=0
+inits <- c(p=p0, c=c0)
+params1 <- c(cin = 3, gamma = 2)
+params2 <- c(cin = 3, gamma = 1.25)
+```
+
+```{r}
+invisible(flowField(zad3,
+          parameters = params1,
+          xlim    = c(0, 4),
+          ylim    = c(0, 3),
+          add     = FALSE,
+          xlab = "c",
+          ylab = "p"))
+invisible(nullclines(zad3,
+          parameters = params1,
+          xlim    = c(0, 4),
+          ylim    = c(0, 3),
+          state.names = c("c", "p"))
+)
+
+invisible(flowField(zad3,
+          parameters = params2,
+          xlim    = c(0, 4),
+          ylim    = c(0, 3),
+          add     = FALSE,
+          xlab = "c",
+          ylab = "p"))
+invisible(nullclines(zad3,
+          parameters = params2,
+          xlim    = c(0, 4),
+          ylim    = c(0, 3),
+          state.names = c("c", "p")))
+```
+
+Dla $c_{in}=2$ i γ=2 układ osiąga stabilny punkt stacjonarny przy niskim stężeniu składnika odżywczego i wysokim zagęszczeniu bakterii – kolonia stabilizuje się i przetrwa. Dla γ=1,25 bakterie rosną zbyt wolno, by zrównoważyć wypłukiwanie – układ może dążyć do stanu z niskim zagęszczeniem bakterii lub ich całkowitego wymarcia. Zatem wzrost γ sprzyja stabilizacji kolonii, a zbyt małe tempo wzrostu prowadzi do jej wymierania.
+
+### Zadanie 4 - degradacja enzymatyczna
+
+a\)
+
+$$
+\frac{d[m_{cI}]}{dt} = r_m^{\text{max}} \left[ \frac{1}{1 + \left(\frac{K_{dis}}{[p_{cI}]}\right)^n} + l_{PRM} \right] - \gamma_m [m_{cI}]
+$$
+
+Pierwsze równanie opisuje tempo zmian stężenia mRNA genu cI. Ekspresja kontrolowana jest przez promotor PRM, który ulega aktywacji przez własny produkt – białko cI. To tworzy dodatnie sprzężenie zwrotne, w którym wzrost ilości cI zwiększa transkrypcję własnego genu. Poziom aktywacji zależy od stężenia białka cI w sposób sigmoidalny (opisany funkcją Hilla), uwzględniając także nieszczelność promotora (bazowa ekspresja). Drugi człon równania uwzględnia liniową degradację mRNA.
+
+$$
+\frac{d[p_{cI}]}{dt} = r_p [m_{cI}] - \gamma_p [p_{cI}] - k_{cat} [p_L] \left( \frac{1}{1 + \frac{K_M}{[p_{cI}]}} \right)
+$$
+
+Drugie równanie opisuje zmiany stężenia białka cI. Produkcja zależy od stężenia mRNA (klasyczna translacja), a degradacja odbywa się na dwa sposoby: liniowo (naturalny rozpad białka) oraz przez enzymatyczną aktywność proteazy mf-Lon. Ta proteaza jest kodowana przez gen mf-lon znajdujący się pod kontrolą konstytutywnego promotora, co oznacza, że jej stężenie jest stałe. Degradacja przez mf-Lon jest opisana zmodyfikowaną kinetyką Michaelisa-Menten i zależy od stężenia cI – przy jego niskich stężeniach degradacja jest mniej wydajna, a przy wyższych bardziej efektywna, aż do nasycenia enzymu.
+
+b\)
+
+```{r}
+zad4 <- function(t, y, parameters) {
+  #parameters
+  n <- parameters[1]
+  K_dis <- parameters[2]
+  l_PRM <- parameters[3]
+  k_cat <- parameters[4]
+  K_M <- parameters[5]
+  r_mmax <- parameters[6]
+  gamma_m <- parameters[7]
+  r_p <- parameters[8]
+  gamma_p <- parameters[9]
+  p_L <- parameters[10]
+
+
+  #variables
+  m_cI     <- y[1]
+  p_cI     <- y[2]
+  
+
+#equation
+  dy    <- c(r_mmax*(1/(1+(K_dis/p_cI)^n)+l_PRM)-gamma_m*m_cI,
+             r_p*m_cI-gamma_p*p_cI-k_cat*p_L*(1/(1+K_M/p_cI))
+             )
+  list(dy)
+}
+
+m_cI0=0
+p_cI0=0
+inits <- c(m_cI = m_cI0, p_cI = p_cI0)
+params1 <- c(n = 1,
+  K_dis = 0.000000025,
+  l_PRM = 0.1,
+  k_cat = 0.071,
+  K_M = 0.0000000037,
+  r_mmax = 0.00000000135,
+  gamma_m = 0.00238,
+  r_p = 0.00005,
+  gamma_p = 0.0002,
+  p_L = 0.0000000001)
+```
+
+```{r}
+
+times <- seq(0, 25000, by = 1)
+out <- as.data.frame(lsoda(inits, times, zad4, params1))
+```
+
+```{r}
+plot(out$time, out$m_cI, 
+     t="l", lwd = 2, col = "royalblue", xlab = "Time", ylab = "Concentration")
+lines(out$time, out$p_cI,
+      lwd = 2, col = "gold")
+legend(0, 4e-7, legend = c("m_cI", "p_cI"),
+       col = c("royalblue", "gold"), lwd = c(2,2))
+```
+
+c\)
+
+```{r}
+
+invisible(flowField(zad4,
+          parameters = params1,
+          xlim    = c(0, 0.0000008),
+          ylim    = c(0, 0.0000002),
+          add     = FALSE,
+          xlab = "m_cI",
+          ylab = "p_cI"))
+invisible(nullclines(zad4,
+          parameters = params1,
+          xlim    = c(0, 0.0000008),
+          ylim    = c(0, 0.0000002),
+          state.names = c("m_cI", "p_cI")))
+```
+
+Przykładowe trajektorie:
+
+```{r}
+
+inits1 <- c(m_cI = 0, p_cI = 0)
+inits2 <- c(m_cI = 0.000001, p_cI = 0.000001)
+inits3 <- c(m_cI = 0.000001, p_cI = 0)
+inits4 <- c(m_cI = 0, p_cI = 0.000001)
+inits5 <- c(m_cI = 0.00000001, p_cI = 0.00000001)
+
+simulation1 <- as.data.frame(lsoda(inits1, times, zad4, params1))
+simulation2 <- as.data.frame(lsoda(inits2, times, zad4, params1))
+simulation3 <- as.data.frame(lsoda(inits3, times, zad4, params1))
+simulation4 <- as.data.frame(lsoda(inits4, times, zad4, params1))
+simulation5 <- as.data.frame(lsoda(inits5, times, zad4, params1))
+
+plot(simulation1$time, simulation1$m_cI, type="l", col="magenta", xlab="time", ylab="concentration",lwd=1.5, ylim=c(0, 0.000001))
+lines(simulation1$time, simulation1$p_cI, type="l", col="magenta",lwd=1.5,lty=2)
+
+lines(simulation2$time, simulation2$m_cI, type="l", col="blue",lwd=1.5)
+lines(simulation2$time, simulation2$p_cI, type="l", col="blue",lwd=1.5,lty=2)
+
+lines(simulation3$time, simulation3$m_cI, type="l", col="darkgreen",lwd=1.5)
+lines(simulation3$time, simulation3$p_cI, type="l", col="darkgreen",lwd=1.5,lty=2)
+
+lines(simulation4$time, simulation4$m_cI, type="l", col="orange",lwd=1.5)
+lines(simulation4$time, simulation4$p_cI, type="l", col="orange",lwd=1.5,lty=2)
+
+lines(simulation5$time, simulation5$m_cI, type="l", col="brown",lwd=1.5)
+lines(simulation5$time, simulation5$p_cI, type="l", col="brown",lwd=1.5,lty=2)
+
+legend(18000, 1e-6, legend = c("m_cI", "p_cI"),
+       col = c("black"), lwd = 1, lty = c(1, 2))
+```
+
+```{r}
+plot(simulation1$m_cI, simulation1$p_cI, type="l", col="magenta", xlab="[m_cI]", ylab="[p_cI]",lwd=1.5,ylim=c(0,0.000001), xlim=c(0,0.000001))
+lines(simulation2$m_cI, simulation2$p_cI, type="l", col="blue",lwd=1.5)
+lines(simulation3$m_cI, simulation3$p_cI, type="l", col="darkgreen",lwd=1.5)
+lines(simulation4$m_cI, simulation4$p_cI, type="l", col="orange",lwd=1.5)
+lines(simulation5$m_cI, simulation5$p_cI, type="l", col="brown",lwd=1.5)
+```
+
+Portret fazowy oraz trajektorie czasowe wskazują, że analizowany układ dąży do jednego stabilnego punktu równowagi. W pierwszym wykresie (portrecie fazowym z nullklinami) przecięcie nullklin dla zmiennych m_cI i p_cI wskazuje na istnienie pojedynczego punktu równowagi. Kierunek wektorów pola w jego otoczeniu sugeruje, że jest to punkt stabilny - trajektorie układu są do niego przyciągane niezależnie od warunków początkowych. Drugi wykres, pokazujący zmiany stężeń w czasie, potwierdza tę obserwację: niezależnie od wartości początkowych, zarówno m_cI, jak i p_cI zbiega do tych samych wartości końcowych, co wskazuje na monostabilność układu. Trzeci wykres (\[m_cI\] vs \[p_cI\] dla różnych wartości początkowych) również pokazuje, że wszystkie trajektorie koncentrują się na jednym punkcie. W analizowanych warunkach parametry modelu nie prowadzą do bistabilności.
+
+d\)
+
+```{r}
+params2 <- c(n = 2,
+  K_dis = 0.000000025,
+  l_PRM = 0.1,
+  k_cat = 0.071,
+  K_M = 0.0000000037,
+  r_mmax = 0.00000000135,
+  gamma_m = 0.00238,
+  r_p = 0.00005,
+  gamma_p = 0.0002,
+  p_L = 0.0000000001)
+
+out2 <- as.data.frame(lsoda(inits, times, zad4, params2))
+```
+
+```{r}
+plot(out2$time, out2$m_cI, 
+     t="l", lwd = 2, col = "royalblue", xlab = "Time", ylab = "Concentration")
+lines(out2$time, out2$p_cI,
+      lwd = 2, col = "gold")
+legend(18000, 4e-8, legend = c("m_cI", "p_cI"),
+       col = c("royalblue", "gold"), lwd = c(2,2))
+```
+
+```{r}
+invisible(flowField(zad4,
+          parameters = params2,
+          xlim    = c(0, 0.0000008),
+          ylim    = c(0, 0.0000002),
+          add     = FALSE,
+          xlab = "m_cI",
+          ylab = "p_cI"))
+invisible(nullclines(zad4,
+          parameters = params2,
+          xlim    = c(0, 0.0000008),
+          ylim    = c(0, 0.0000002),
+          state.names = c("m_cI", "p_cI")))
+```
+
+```{r}
+simulation1 <- as.data.frame(lsoda(inits1, times, zad4, params2))
+simulation2 <- as.data.frame(lsoda(inits2, times, zad4, params2))
+simulation3 <- as.data.frame(lsoda(inits3, times, zad4, params2))
+simulation4 <- as.data.frame(lsoda(inits4, times, zad4, params2))
+simulation5 <- as.data.frame(lsoda(inits5, times, zad4, params2))
+
+plot(simulation1$time, simulation1$m_cI, type="l", col="magenta", xlab="time", ylab="concentration",lwd=1.5, ylim=c(0, 0.000001))
+lines(simulation1$time, simulation1$p_cI, type="l", col="magenta",lwd=1.5,lty=2)
+
+lines(simulation2$time, simulation2$m_cI, type="l", col="blue",lwd=1.5)
+lines(simulation2$time, simulation2$p_cI, type="l", col="blue",lwd=1.5,lty=2)
+
+lines(simulation3$time, simulation3$m_cI, type="l", col="darkgreen",lwd=1.5)
+lines(simulation3$time, simulation3$p_cI, type="l", col="darkgreen",lwd=1.5,lty=2)
+
+lines(simulation4$time, simulation4$m_cI, type="l", col="orange",lwd=1.5)
+lines(simulation4$time, simulation4$p_cI, type="l", col="orange",lwd=1.5,lty=2)
+
+lines(simulation5$time, simulation5$m_cI, type="l", col="brown",lwd=1.5)
+lines(simulation5$time, simulation5$p_cI, type="l", col="brown",lwd=1.5,lty=2)
+
+legend(18000, 1e-6, legend = c("m_cI", "p_cI"),
+       col = c("black"), lwd = 1, lty = c(1, 2))
+```
+
+```{r}
+plot(simulation1$m_cI, simulation1$p_cI, type="l", col="magenta", xlab="[m_cI]", ylab="[p_cI]",lwd=1.5,ylim=c(0,0.000001), xlim=c(0,0.000001))
+lines(simulation2$m_cI, simulation2$p_cI, type="l", col="blue",lwd=1.5)
+lines(simulation3$m_cI, simulation3$p_cI, type="l", col="darkgreen",lwd=1.5)
+lines(simulation4$m_cI, simulation4$p_cI, type="l", col="orange",lwd=1.5)
+lines(simulation5$m_cI, simulation5$p_cI, type="l", col="brown",lwd=1.5)
+```
+
+e\)
+
+Wprowadzenie kooperatywności (n = 2), czyli możliwości jednoczesnego wiązania dwóch cząsteczek białka cI do promotora PRM, prowadzi do jakościowej zmiany dynamiki układu — pojawia się bistabilność. Układ z pojedynczym wiązaniem (n = 1) zachowuje się monostabilnie i dąży zawsze do jednego stanu równowagi. Wersja z n = 2 pozwala układowi osiągnąć jeden z dwóch alternatywnych stabilnych stanów: niskiej lub wysokiej ekspresji białka cI (p_cI). Biologicznie odpowiada to konstrukcji syntetycznego przełącznika dwustanowego, w którym dodatnie sprzężenie zwrotne umożliwia trwałe utrzymanie ekspresji cI nawet w obecności jego degradacji. Punkt niestabilny widoczny w portrecie fazowym jako środkowe przecięcie nullklin pełni funkcję granicy między dwoma stabilnymi stanami i warunkuje „przełączenie” układu pod wpływem sygnału lub zaburzenia.
+
+f\)
+
+```{r}
+
+params3 <- c(n = 2,
+  K_dis = 0.000000025,
+  l_PRM = 0.1,
+  k_cat = 0.071,
+  K_M = 0.00000000037,
+  r_mmax = 0.00000000135,
+  gamma_m = 0.00238,
+  r_p = 0.00005,
+  gamma_p = 0.0002,
+  p_L = 0.0000000001)
+
+params4 <- c(n = 2,
+  K_dis = 0.000000025,
+  l_PRM = 0.1,
+  k_cat = 0.071,
+  K_M = 0.000000037,
+  r_mmax = 0.00000000135,
+  gamma_m = 0.00238,
+  r_p = 0.00005,
+  gamma_p = 0.0002,
+  p_L = 0.0000000001)
+
+params5 <- c(n = 2,
+  K_dis = 0.000000025,
+  l_PRM = 0.1,
+  k_cat = 0.071,
+  K_M = 0.00000037,
+  r_mmax = 0.00000000135,
+  gamma_m = 0.00238,
+  r_p = 0.00005,
+  gamma_p = 0.0002,
+  p_L = 0.0000000001)
+
+params6 <- c(n = 2,
+  K_dis = 0.000000025,
+  l_PRM = 0.1,
+  k_cat = 0.071,
+  K_M = 0.0000037,
+  r_mmax = 0.00000000135,
+  gamma_m = 0.00238,
+  r_p = 0.00005,
+  gamma_p = 0.0002,
+  p_L = 0.0000000001)
+```
+
+```{r}
+simulation1 <- as.data.frame(lsoda(inits1, times, zad4, params2))
+simulation2 <- as.data.frame(lsoda(inits1, times, zad4, params3))
+simulation3 <- as.data.frame(lsoda(inits1, times, zad4, params4))
+simulation4 <- as.data.frame(lsoda(inits1, times, zad4, params5))
+simulation5 <- as.data.frame(lsoda(inits1, times, zad4, params6))
+
+plot(simulation1$time, simulation1$m_cI, type="l", col="magenta", xlab="time", ylab="concentration",lwd=1.5, ylim=c(0, 0.000001))
+lines(simulation1$time, simulation1$p_cI, type="l", col="magenta",lwd=1.5,lty=2)
+
+lines(simulation2$time, simulation2$m_cI, type="l", col="blue",lwd=1.5)
+lines(simulation2$time, simulation2$p_cI, type="l", col="blue",lwd=1.5,lty=2)
+
+lines(simulation3$time, simulation3$m_cI, type="l", col="darkgreen",lwd=1.5)
+lines(simulation3$time, simulation3$p_cI, type="l", col="darkgreen",lwd=1.5,lty=2)
+
+lines(simulation4$time, simulation4$m_cI, type="l", col="orange",lwd=1.5)
+lines(simulation4$time, simulation4$p_cI, type="l", col="orange",lwd=1.5,lty=2)
+
+lines(simulation5$time, simulation5$m_cI, type="l", col="brown",lwd=1.5)
+lines(simulation5$time, simulation5$p_cI, type="l", col="brown",lwd=1.5,lty=2)
+
+legend(0, 1e-6, legend = c("Km=3.7e-9", "Km=3.7e-10","Km=3.7e-8","Km=3.7e-7","Km=3.7e-6"),
+       col = c("magenta", "blue", "darkgreen", "orange", "brown"), lwd = 2)
+
+legend(8000, 1e-6, legend = c("m_cI", "p_cI"),
+       col = c("black"), lwd = 1, lty = c(1, 2))
+```
+
+Zmiana stałej Michaelisa K_M proteazy mf-Lon wpływa na skuteczność degradacji białka cI. Dla niskich wartości K_M, proteaza degraduje białko skutecznie nawet przy niskim jego stężeniu, co utrudnia aktywację dodatniego sprzężenia zwrotnego. W rezultacie układ inicjujący z niskimi wartościami m_cl i p_cl pozostaje w stanie niskiej ekspresji cI. Natomiast przy wysokim K_M proteaza jest mniej aktywna przy małych stężeniach substratu, co pozwala nawet niewielkim ilościom cI zainicjować aktywację własnej ekspresji i przejść do wysokiego stanu stabilnego. Wzrost K_M zatem przesuwa układ z bistabilnego w stronę monostabilności z preferencją do wysokiego stanu ekspresji cI.

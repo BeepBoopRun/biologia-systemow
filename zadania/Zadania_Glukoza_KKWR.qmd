@@ -1,0 +1,301 @@
+---
+title: "Zadania Glukoza"
+author: "Wiktor Rorat, Kinga Kurowska"
+format: 
+  html:
+    embed-resources: true
+editor: visual
+---
+
+```{r}
+library(deSolve)
+library(phaseR)
+```
+
+# Model minimalny
+
+$\frac{dG}{dt}=m-sIG$
+
+$\frac{dI}{dt}=qBf(G)-\gamma I$
+
+Parametry: $s=q=γ=B=1$ i $m=0.5$
+
+$f(G)=\frac{G^2}{1+G^2}$
+
+1.  Znajdź rozwiązania stacjonarne.
+
+2.  Przeprowadź symulację testu doustnego obciążenia glukozą, zmieniając wartość parametru $m$ w czasie: $m(t)=0.5+e^{-(t-5)^2}$. Symulację rozpocznij w stanie stacjonarnym i w chwili czasu $t=0$. Wykreśl zależność stężeń glukozy i insuliny w czasie.
+
+3.  Zasymuluj insulinooporność, ustawiając $s=0.1$. Powtórz powyższą symulację i porównaj wyniki.
+
+4.  Dla obu przypadków (tj. dla $s=1$ i $s=0.1$) narysuj portrety fazowe, zaznacz izokliny zerowe (nullclines) i przykłądowe trajektorie rozwiązań.
+
+5.  Krótko skomentuj wyniki.
+
+### 1. Rozwiązania stacjonarne
+
+$$ \frac{dG}{dt} = 0 \space\text{i}\space \frac{dI}{dt} = 0 $$ Z pierszego równania:
+
+$$0 = m - sI^*G^*, \space m = sI^*G^*$$ Z drugiego równania: $$0 = qBf(G) - \gamma I^*$$ $$I^* = \frac{ qBf(G^*)}{\gamma}$$ Połączone razem: $$m = s(\frac{ qBf(G^*)}{\gamma})G^*, \space \text{podstawiamy } f(G)$$ $$1 = \frac{ sqB}{m\gamma}\frac{(G^*)^3}{1 + (G^{*})^2} \text{ dla } K = \frac{ sqB}{m\gamma}$$ $$1 + (G^{*})^2 = K(G^*)^3$$ $$K(G^*)^3 - (G^*)^2 - 1 = 0$$ Dla naszych parametrów K=2, więc $$G^*=1$$ $$I^* = \frac{m}{sG^*} = 0,5$$
+
+```{r}
+minimal_model <- function(t, y, parameters) {
+  s    <- parameters[1]
+  q    <- parameters[2]
+  B    <- parameters[3]
+  gamma    <- parameters[4]
+  m    <- parameters[5]
+
+
+  G     <- y[1]
+  I     <- y[2]
+
+  dy    <- c(m - s*I*G, q*B*(G^2/(1+G^2)) - gamma * I)
+
+  list(dy)
+}
+
+parameters <- c(s=1,q=1,B=1,gamma=1,m=0.5)
+inits <- c(G=2,I=2)
+dt <- seq(0,100,0.1)
+
+sol <- as.data.frame(lsoda(inits, dt, minimal_model, parameters))
+
+plot(dt, sol$G, type="l", col="blue", xlab="time", ylab="concentration",lwd=3,ylim=c(0,2))
+lines(dt, sol$I, type="l", col="red", lwd=3)
+legend("topright", c("Glucose", "Insulin"), col=c("blue", "red"), lty=c(1,1))
+title("Potwierdzenie wyznaczonego analitycznie stanu stacjonarnego")
+```
+
+### 2. Symulacja OGTT
+
+```{r}
+minimal_model_variable_m <- function(t, y, parameters) {
+  s    <- parameters[1]
+  q    <- parameters[2]
+  B    <- parameters[3]
+  gamma    <- parameters[4]
+
+
+  G     <- y[1]
+  I     <- y[2]
+
+  variable_m <- function(t) 0.5 + exp(-(t-5)^2)
+
+  dy    <- c(variable_m(t) - s*I*G, q*B*(G^2/(1+G^2)) - gamma * I)
+
+  list(dy)
+}
+
+parameters <- c(s=1,q=1,B=1,gamma=1)
+inits <- c(G=1,I=0.5)
+dt <- seq(0,25,0.1)
+
+sol <- as.data.frame(lsoda(inits, dt, minimal_model_variable_m, parameters))
+
+plot(dt, sol$G, type="l", col="blue", xlab="time", ylab="concentration",lwd=3,ylim=c(0,2))
+lines(dt, sol$I, type="l", col="red", lwd=3)
+legend("topright", c("Glucose", "Insulin"), col=c("blue", "red"), lty=c(1,1))
+title("Test doustnego obciążenia glukozą")
+```
+
+Zaobserwować możemy, że odpowiedź insuliny jest delikatnie przesunięta w czasie, poziom glukozy musi najpierw wzrosnąć, by wymusić reakcję trzustki.
+
+### 3. Symulacja insulinooporności
+
+```{r}
+parameters <- c(s=0.1,q=1,B=1,gamma=1)
+inits <- c(G=1,I=0.5)
+dt <- seq(0,200,0.1)
+
+sol <- as.data.frame(lsoda(inits, dt, minimal_model_variable_m, parameters))
+
+plot(dt, sol$G, type="l", col="blue", xlab="time", ylab="concentration",lwd=3,ylim=c(0,max(sol$G) + 1))
+lines(dt, sol$I, type="l", col="red", lwd=3)
+legend("topright", c("Glucose", "Insulin"), col=c("blue", "red"), lty=c(1,1))
+title("Test doustnego obciążenia glukozą")
+```
+
+Zmienia się stan stacjonarny, zamiast G=1 i I=0.5, teraz jest G=5 i I=1. Oznacza to, że stan spoczynkowy glukozy w organiźmie jest znacznie wyższy, taki stan może zagrażać zdrowiu.
+
+### 4. Portrety fazowe
+
+```{r}
+parameters <- c(s=1,q=1,B=1,gamma=1)
+invisible(flowField(minimal_model_variable_m, c(0,10), c(0,10), parameters,
+system = "two.dim", add=FALSE, state.names = c("Glucose", "Insulin")))
+invisible(nullclines(minimal_model_variable_m, c(0,10), c(0,10), parameters,
+system = "two.dim", add.legend = FALSE, col = c("blue", "red"), lwd=3))
+legend("topright", c("Glucose", "Insulin"), col=c("blue", "red"), lty=c(1,1))
+title("Portret fazowy dla s=1")
+
+parameters <- c(s=0.1,q=1,B=1,gamma=1)
+invisible(flowField(minimal_model_variable_m, c(0,10), c(0,10), parameters, system = "two.dim", add=FALSE))
+legend("topright", c("Glucose", "Insulin"), col=c("blue", "red"), lty=c(1,1))
+title("Portret fazowy dla s=0.1")
+invisible(nullclines(minimal_model_variable_m, c(0,10), c(0,10), parameters,
+system = "two.dim", add.legend = FALSE, col = c("blue", "red"), lwd=3))
+
+```
+
+Model ma jeden punkt stabilny dla dodatnich parametrów.
+
+### 5. Komentarz
+
+Zaobserwować możemy, że dla niskiej wrażliwości tkanek na insulinę stężenie glukozy w stan stacjonarnym jest znacznie większe, co oznacza zagrożenie dla pacjenta. Model nie przewiduje żadnego sposobu, by poziom glukozy w stanie stacjonarnym powrócił do oryginalnej wartości po zmianie insulinowrażliwości (s).
+
+# Model BIG
+
+Model βIG lepiej niż model minimalny opisuje zależność między liczbą komórek β trzustki, produkowaną przez nie insuliną i stężeniem glukozy we krwi. Dany jest następującymi równaniami różniczkowymi:
+
+$\frac{dG}{dt}=m-sIG$
+
+$\frac{dI}{dt}=qBf(G)-γI$
+
+$dB/dt=Bμ(G),$ przy czym $μ(G^*=5mM)=0$
+
+Użyj następujących parametrów: $s=q=γ=1,m=1$ oraz $f(G)=G^2$ i $\frac{dB}{dt}=0.01B(G-5)$. To ostatnie równanie - za sprawą czynnika 0.01 - sprawia, że tempo proliferacji komórek β trzustki jest dużo wolniejsze od „szybkiego” działania hormonów.
+
+1.  Wykreśl zależność $G(t),I(t) \text{ oraz } B(t)$.
+2.  Przeprowadź kolejną symulację, tym razem w chwili t=100 zmieniając wartość parametru s z $s=1$ na $s=0.1$ i zilustruj związaną z tym zmianę stanu stacjonarnego B. Wyznacz stan stacjonarny, przyrównując powyższe równania do zera.
+3.  Wykreśl zależności $G(t)$ i $I(t)$ w odpowiedzi na posiłek, również pozwalając na zmianę wartości $s$ w chwili $t=100$ (później już go nie zmieniamy), dokładnie tak, jak w p. 2. Efekt posiłku otrzymasz, zmieniając wartość parametru m z $m=1$ na $m=2$. Niech ta zmiana trwa jedną jednostkę czasu, po czym niech wartość parametru m powróci do wartości wyjściowej. W symulacji uwzględnij posiłek w trzech momentach: $t_{posiłku}= 90$, $t_{posiłku}= 100$ i $t_{posiłku}= 300$. Porównaj zarówno amplitudę zmian glukozy, jak również czas powrotu do stanu stacjonarnego w zależności od momentu posiłku (tuż przed, tuż po, czy długo po zmianie wartości $s$). W jaki sposób te wyniki wiążą się z pojęciem „dynamicznej kompensacji”, poznanym na wykładzie?
+
+### 1. Zależności $G(t), \space I(t), \space B(t)$
+
+```{r}
+BIG_model <- function(t, y, parameters) {
+  s    <- parameters[1]
+  q    <- parameters[2]
+  gamma    <- parameters[3]
+  m    <- parameters[4]
+
+
+  G     <- y[1]
+  I     <- y[2]
+  B     <- y[3]
+
+  dy    <- c(m - s*I*G, q*B*G^2 - gamma * I, 0.01*B*(G-5))
+
+  list(dy)
+}
+
+parameters <- c(s=1, q=1, gamma=1, m=1)
+inits <- c(G=5, I=0.2, B=0.3)
+dt <- seq(0,400,0.1)
+
+sol <- as.data.frame(lsoda(inits, dt, BIG_model, parameters))
+
+plot(dt, sol$G, type="l", col="blue", xlab="time", ylab="concentration",lwd=3,ylim=c(0,max(sol$G, sol$I) + 1))
+lines(dt, sol$I, type="l", col="red", lwd=3)
+lines(dt, sol$B, type="l", col="darkgreen", lwd=3)
+legend("topright", c("Glucose", "Insulin", "Beta cells"), col=c("blue", "red", "darkgreen"), lty=c(1,1,1))
+title("Symulacja modelu BIG")
+```
+
+Koncentrację insuliny i ilość komórek beta wybraliśmy losowo - puszczając symulację na wystarczająco długi okres czasu możemy wyznaczyć wartości w stanie ustalonym.
+
+### 2. Symulacja ze spadkiem insulinowrażliwości (s)
+
+```{r}
+BIG_model_dynamic_s <- function(t, y, parameters) {
+  q    <- parameters[1]
+  gamma    <- parameters[2]
+  m    <- parameters[3]
+
+  s <- if(t<100) 1 else 0.1
+
+  G     <- y[1]
+  I     <- y[2]
+  B     <- y[3]
+
+  dy    <- c(m - s*I*G, q*B*G^2 - gamma * I, 0.01*B*(G-5))
+
+  list(dy)
+}
+
+parameters <- c(q=1, gamma=1, m=1)
+inits <- c(G=5, I=0.2, B=0.008)
+dt <- seq(0,600,0.1)
+
+sol <- as.data.frame(lsoda(inits, dt, BIG_model_dynamic_s, parameters))
+
+plot(dt, sol$G, type="l", col="blue", xlab="time", ylab="concentration",lwd=3,ylim=c(0,max(sol$G, sol$I) + 1))
+lines(dt, sol$I, type="l", col="red", lwd=3)
+par(new = TRUE)
+plot(dt, sol$B, type="l", col="darkgreen", axes = FALSE, xlab = "", ylab = "", lwd=3, ylim=c(0,0.3))
+axis(side = 4, col.axis = "darkgreen", col = "darkgreen")
+legend("topright", c("Glucose", "Insulin", "Beta cells"), col=c("blue", "red", "darkgreen"), lty=c(1,1,1))
+title("Symulacja modelu BIG - stan insulinooporności od t=100")
+```
+
+Zaobserwować możemy, że ilość komórek beta zmienia się w odpowiedzi na insulinooporność organizmu - organizm jest mniej wrażliwy na insulinę, więc wzrasta ilość komórek beta, by przywrocić oczekiwane stężenie glukozy w organiźmie.
+
+Wyznaczenie wartości w stanie stacjonarnym:
+
+$$0=m-sI^*G^*$$
+
+$$0=qB^*(G^*)^2-γI^*$$
+
+$$0=0.01(G^*-5) \implies G^*=5$$
+
+z pierwszego równania
+
+$$I^* = \frac{m}{sG^*}$$
+
+z drugiego równania
+
+$$B^* = \frac{\gamma I^*}{q(G^*)^2}$$
+
+dla $s=q=\gamma=m=1$
+
+$$G^*=5,\space I^*=0.2,\space B=0.008$$
+
+dla $q=\gamma=m=1$ i $s=0.1$
+
+$$G^*=5,\space I^*=0.2, \space B=0.08$$
+
+Ilość komórek zmienia się 10-krotnie!
+
+### 3. Symulacja posiłków
+
+```{r}
+BIG_model_dynamic_s <- function(t, y, parameters) {
+  q    <- parameters[1]
+  gamma    <- parameters[2]
+
+  s <- if(t<100) 1 else 0.1
+
+  m <- 1
+
+  if(t>=90 & t <=91) m=2
+  if(t>=100 & t <=101) m=2
+  if(t>=300 & t <=301) m=2
+
+  G     <- y[1]
+  I     <- y[2]
+  B     <- y[3]
+
+  dy    <- c(m - s*I*G, q*B*G^2 - gamma * I, 0.01*B*(G-5))
+
+  list(dy)
+}
+
+parameters <- c(q=1, gamma=1)
+inits <- c(G=5, I=0.2, B=0.008)
+dt <- seq(0,400,0.1)
+
+sol <- as.data.frame(lsoda(inits, dt, BIG_model_dynamic_s, parameters))
+
+plot(dt, sol$G, type="l", col="blue", xlab="time", ylab="concentration",lwd=3,ylim=c(0,max(sol$G, sol$I) + 1))
+lines(dt, sol$I, type="l", col="red", lwd=3)
+abline(v=90, col="blue", lty=3)
+abline(v=100, col="blue", lty=3)
+abline(v=300, col="blue", lty=3)
+legend("topright", c("Glucose", "Insulin"), col=c("blue", "red"), lty=c(1,1))
+
+title("Symulacja posiłków w modelu BIG - stan insulinooporności od t=100")
+```
+
+Nie jesteśmy w stanie zaobserwować jak wygląda dynamika posiłu w czasie t=100, zmiana parametru s zakrywa zmiany w poziemie glukozy wywołane posiłkiem.
+
+Porównując zmiany w poziomie glukozy w czasie t=90 i t=300 możemy zauważyć, że piki są praktycznie identyczne. Odzyskanie oryginalnej dynamiki wynika z kompensacji dynamicznej - zmiana ilości komórek beta powoduje, że wydzielane jest więcej insuliny, co efektywnie niweluje zmniejszenie parametru s.

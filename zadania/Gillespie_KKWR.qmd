@@ -1,0 +1,356 @@
+---
+title: "Rozwiązanie zadań z Algorytmu Gillespiego"
+author: "Kinga Kurowska, Wiktor Rorat"
+format: 
+  html:
+      df-print: paged
+# print df as tables https://quarto.org/docs/computations/r.html#data-frames
+      tidy: false
+      embed-resources: true
+      theme: lumen
+      toc: true
+      toc-location: left
+      toc-depth: 6
+      toc-expand: 6
+      code-tools:
+          source: true
+          toggle: true
+      code-fold: false
+      code-summary: "Show the code"
+      code-overflow: wrap
+      page-layout: full
+editor: visual
+lang: pl
+---
+
+```{r}
+library(deSolve)
+```
+
+## Implementacja algorytmu Gillespiego (z zadań)
+
+```{r}
+###########################################################################
+#1. Ustalamy warunki początkowe, końcowe i parametry
+###########################################################################
+k_ab <- 0.1
+k_ba <- 0.2
+A_0  <- 50
+B_0  <- 0
+A  <- c(A_0)
+B  <- c(B_0)
+###########################################################################
+#2. czas: t=0
+###########################################################################
+times <- c(0)
+t_max  <- 100
+#aktualny czas, żeby sprawdzić, czy już należy kończyć symulację
+t_now  <- 0
+#counter posłuży jako licznik kroków reakcji; ponieważ zaczynamy z wartościami 
+#początkowymi, następna reakcja będzie miała numer 2,kolejna 3 itd.
+counter <- 2
+###########################################################################
+#3. - 10. w pętli
+###########################################################################
+while(t_now<=t_max){
+###########################################################################
+#3. liczymy skłonności
+###########################################################################
+#Synteza
+prop1 <- k_ab*A[counter-1]
+#Analiza
+prop2 <- k_ba*B[counter-1]
+#liczymy sumę skłonności
+h <- prop1 + prop2
+###########################################################################
+#4.losujemy r1,r2
+###########################################################################
+r1 <- runif(1)
+r2 <- runif(1)
+
+###########################################################################
+#5. Określamy KIEDY zajdzie następna reakcja
+###########################################################################
+tau <- -log(r1)/h
+
+###########################################################################
+#6-7.Określamy KTÓRA zajdzie reakcja i od razu
+#9. AKTUALIZUJEMY stężenia, czyli określamy EFEKT reakcji
+###########################################################################
+#określamy, która zajdzie reakcja i jej konsekwencje
+#Synteza
+if(0<= r2 && r2 < prop1/h) {
+  A[counter] <- A[counter-1] - 1
+  B[counter] <- B[counter-1] + 1
+  #zabezpieczamy się na wypadek "ujemnych" stężeń
+  if(A[counter]<0) A[counter] <- 0
+}
+#Analiza
+if(prop1/h <= r2 && r2 <= 1) {
+  A[counter] <- A[counter-1] + 1
+  B[counter] <- B[counter-1] - 1
+  #zabezpieczamy się na wypadek "ujemnych" stężeń
+  if(B[counter]<0) B[counter] <- 0
+}  
+
+###########################################################################
+#9. Aktualizujemy czasy - wektor i czas aktualny - oraz licznik reakcji
+###########################################################################
+
+times[counter] <- times[counter-1] + tau
+t_now  <- t_now + tau
+counter <- counter + 1
+}
+```
+
+# Zadanie 1:
+
+Wyrysuj obie trajektorie na jednym wykresie
+
+```{r}
+plot(times,A,t="l",col="darkgreen", ylim=c(0, max(A,B)),
+     xlab="Czas", ylab="Ilość cząsteczek")
+lines(times,B,t="l",col="orange")
+legend("topright", c("A","B"), col=c("darkgreen", "orange"), lty=c(1,1))
+title("Wspólna trajektoria")
+```
+
+Symetria wynika ze stałej ilości cząsteczek.
+
+# Zadanie 2:
+
+Wyrysuj na jednym wykresie obie trajektorie otrzymane z symulacji stochastycznej (algorytm Gillespiego) ORAZ wyniki symulacji deterministycznej modelu, opisującego ewolucję czasową ilości cząstek obu reagentów: A i B.
+
+```{r}
+# Ciągła i deterministyczna funkcja opisująca naszą dynamikę
+cont_approx <- function(t, y, parameters) {
+  
+  kAB <- parameters[1]
+  kBA <- parameters[2]
+  
+  A     <- y[1]
+  B     <- y[2]
+  
+  dy    <- c(-kAB*A + kBA*B, kAB*A - kBA*B)
+  list(dy)
+}
+
+times_c <- seq(0,100,0.1)
+inits <- c(A=50,B=0)
+params <- c(kAB=0.1, kBA=0.2)
+
+out <- as.data.frame(lsoda(inits, times_c, cont_approx, params))
+
+plot(times,A,t="l",col="darkgreen", ylim=c(0, max(A,B)),
+     xlab="Czas", ylab="Ilość cząsteczek")
+lines(times,B,t="l",col="orange")
+lines(out$time, out$A, col="darkgreen",  lty=2, lw=2)
+lines(out$time, out$B, col="orange",  lty=2, lw=2)
+legend("topright", c("A","B"), col=c("darkgreen", "orange"), lty=c(1,1))
+title("Wspólna trajektoria z ciągłym przybliżeniem")
+```
+
+# Zadanie 3:
+
+Przeprowadź analogiczne rozważania dla modelu łączenia ligandu L z receptorem R: L + R \<=\> LR
+
+```{r}
+k1 <- 0.01
+k2 <- 0.2
+L0  <- 25
+R0  <- 50
+LR0 <- 0
+
+L  <- c(L0)
+R  <- c(R0)
+LR <- c(LR0)
+
+times <- c(0)
+t_max  <- 100
+
+t_now  <- 0
+counter <- 2
+
+while(t_now<=t_max){
+  
+  prop1 <- k1*L[counter-1]*R[counter-1]
+  prop2 <- k2*LR[counter-1]
+  h <- prop1 + prop2
+  
+  r1 <- runif(1)
+  r2 <- runif(1)
+  
+  tau <- -log(r1)/h
+  
+  # wiemy, że r1 i r2 są w zakresie [0,1] z rozkładu powyżej
+  # else, ponieważ mamy dwie reakcje, zawsze jedna ma miejsce
+
+    if(r2 < prop1/h) {
+    L[counter] <- L[counter-1] - 1
+    R[counter] <- R[counter-1] - 1
+    LR[counter] <- LR[counter-1] + 1
+  } else {
+    L[counter] <- L[counter-1] + 1
+    R[counter] <- R[counter-1] + 1
+    LR[counter] <- LR[counter-1] - 1
+  }  
+  
+
+  times[counter] <- times[counter-1] + tau
+  t_now  <- t_now + tau
+  counter <- counter + 1
+}
+
+cont_approx_LR <- function(t, y, parameters) {
+  
+  k1 <- parameters[1]
+  k2 <- parameters[2]
+  
+  L     <- y[1]
+  R     <- y[2]
+  LR     <- y[3]
+  
+  dy    <- c(-k1*L*R + k2*LR,
+             -k1*L*R + k2*LR,
+             k1*L*R - k2*LR)
+  list(dy)
+}
+
+times_c <- seq(0,100,0.1)
+inits <- c(L=L0, R=R0, LR=LR0)
+params <- c(k1=k1, k2=k2)
+
+out <- as.data.frame(lsoda(inits, times_c, cont_approx_LR, params))
+
+plot(times,L,t="l",col="darkgreen", ylim=c(0, max(L,R,LR)),
+     xlab="Czas", ylab="Ilość cząsteczek")
+lines(times,R,t="l",col="orange")
+lines(times,LR,t="l",col="darkblue")
+lines(out$time,out$L,col="darkgreen", lty=2, lw=2)
+lines(out$time,out$R,col="orange", lty=2, lw=2)
+lines(out$time,out$LR,col="darkblue", lty=2, lw=2)
+
+legend("topright", c("L","R","LR"), col=c("darkgreen", "orange", "darkblue"), lty=c(1,1,1))
+title("Wiązanie liganda L+R = LR")
+```
+
+# Zadanie z badania:
+
+```{r}
+expression_model <- function(kR, kP, gammaR, gammaP, p0, m0) {
+
+  p  <- c(p0)
+  m  <- c(m0)
+  
+  times <- c(0)
+  t_max  <- 8*60*60
+  
+  t_now  <- 0
+  counter <- 2
+
+    while(t_now<=t_max){
+    
+    prop1 <- kR
+    prop2 <- gammaR*m[counter-1]
+    prop3 <- kP*m[counter-1]
+    prop4 <- gammaP*p[counter-1]
+    h <- prop1 + prop2 + prop3 + prop4
+    
+    r1 <- runif(1)
+    r2 <- runif(1)
+
+    tau <- -log(r1)/h
+    
+
+    # wiemy, że r1 i r2 są w zakresie [0,1] z rozkładu powyżej
+  
+    if(r2 <= prop1/h) {
+      m[counter] <- m[counter-1] + 1
+      p[counter] <- p[counter-1]
+    } else if (r2 <= (prop1+prop2)/h) {
+      m[counter] <- m[counter-1] - 1
+      p[counter] <- p[counter-1]
+    } else if (r2 <= (prop1+prop2+prop3)/h) {
+      m[counter] <- m[counter-1]
+      p[counter] <- p[counter-1] + 1
+    } else {
+      m[counter] <- m[counter-1]
+      p[counter] <- p[counter-1] - 1
+    } 
+    
+  
+    times[counter] <- times[counter-1] + tau
+    t_now  <- t_now + tau
+    counter <- counter + 1
+    }
+  
+  return(data.frame(times,p,m))
+}
+
+
+expression_model_cont <- function(t, y, parameters) {
+  
+  kR <- parameters[1]
+  kP <- parameters[2]
+  gammaR <- parameters[3]
+  gammaP <- parameters[4]
+  
+  p     <- y[1]
+  m     <- y[2]
+  
+ dy <- c(kP*m - gammaP*p,  kR - gammaR*m) 
+  list(dy)
+}
+
+times_c <- seq(0,8*60*60,0.1)
+
+inits <- c(p=0, m=0)
+params <- c(kR=0.01, kP=1, gammaR=0.1, gammaP=0.002)
+out <- as.data.frame(lsoda(inits, times_c, expression_model_cont, params))
+
+out_d_slow <- expression_model(kR=0.01, kP=1, gammaR=0.1, gammaP=0.002, p0=0, m0=0)
+# zmieniamy czas z sekund na godziny
+plot(out_d_slow$times/(60*60),out_d_slow$p,t="l",col="darkgreen",
+     ylim=c(0, max(out_d_slow$p,out_d_slow$m)),
+     xlab="Czas [h]", ylab="Ilość cząsteczek",
+     xaxt = "n", yaxt = "n")
+axis(1, at = pretty(out_d_slow$times/(60*60), n = 10))
+axis(2, at = pretty(out_d_slow$p, n = 9))
+lines(out_d_slow$times/(60*60),out_d_slow$m,t="l",col="orange")
+lines(out$time/(60*60),out$m,lty=2,col="orange")
+lines(out$time/(60*60),out$p,lty=2,col="darkgreen")
+legend("topright", c("Białko","mRNA"), col=c("darkgreen", "orange"), lty=c(1,1))
+title("Wolna transkrypcja i szybka translacja")
+
+params <- c(kR=0.01, kP=1, gammaR=0.1, gammaP=0.002, p0=0, m0=0)
+out <- as.data.frame(lsoda(inits, times_c, expression_model_cont, params))
+
+out_d_fast <- expression_model(kR=0.1, kP=0.1, gammaR=0.1, 
+                               gammaP=0.002, p0=0, m0=0)
+# zmieniamy czas z sekund na godziny
+plot(out_d_fast$times/(60*60),out_d_fast$p,t="l",col="darkgreen", 
+     ylim=c(0, max(out_d_fast$p,out_d_fast$m)),
+     xaxt = "n", yaxt = "n",
+     xlab="Czas [h]", ylab="Ilość cząsteczek")
+axis(1, at = pretty(out_d_fast$times/(60*60), n = 10))
+axis(2, at = pretty(out_d_fast$p, n = 9))
+lines(out$time/(60*60),out$m,lty=2,col="orange")
+lines(out$time/(60*60),out$p,lty=2,col="darkgreen")
+lines(out_d_fast$times/(60*60),out_d_fast$m,t="l",col="orange")
+legend("topright", c("Białko","mRNA"), col=c("darkgreen", "orange"), lty=c(1,1))
+title("Szybka transkrypcja i wolna translacja")
+
+# wartości do histogramu bierzemy z symulacji dopiero po 1h,
+# uznajemy to za stan ustalony, unikamy w ten sposób nierealistycznie
+# gruby ogon z lewej strony
+
+hist(out_d_fast$p[out_d_fast$times > 60*60], main="Ilość cząsteczek białka w zależności od parametrów", xlab="", 
+     ylab="", col=rgb(144, 238, 144, maxColorValue = 255, alpha = 1*255), xlim = c(0, max(out_d_slow$p, out_d_fast$p)))
+hist(out_d_slow$p[out_d_fast$times > 60*60], xlab="", 
+     ylab="", col=rgb(173, 216, 230, maxColorValue = 255, alpha = 0.4*255), add=TRUE)
+legend("topright", legend=c("kR=0.01, kP=1", "kR=0.1, kP=0.1"), fill=c("lightblue", "lightgreen"))
+```
+
+Zaobserwować możemy, że niskie kR, odpowiadające wolnej transkrypcji, w połączeniu z wysokim kP, odpowiadającym szybkiej translacji, powoduje szeroki rozkład ilości białka.
+
+I odwrotnie, wysokie kR i niskie kP powoduje wąski rozkład, odpowiadający dokładnie regulowanej ilości białka.

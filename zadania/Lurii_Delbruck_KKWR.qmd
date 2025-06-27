@@ -1,0 +1,95 @@
+---
+title: "Implementacja eksperymentu Lurii i Delbrücka"
+author: "Kinga Kurowska, Wiktor Rorat"
+format: 
+  html:
+      df-print: paged
+# print df as tables https://quarto.org/docs/computations/r.html#data-frames
+      tidy: false
+      embed-resources: true
+      theme: lumen
+      toc: true
+      toc-location: left
+      toc-depth: 6
+      toc-expand: 6
+      code-tools:
+          source: true
+          toggle: true
+      code-fold: false
+      code-summary: "Show the code"
+      code-overflow: wrap
+      page-layout: full
+editor: visual
+lang: pl
+---
+
+```{r}
+library(ggplot2)
+symulacja_hodowli <- function(N_wild, N_mutant, alfa_g, g) {
+  i_resistance = NA
+  for (i in 1:g) {
+    N_wild = N_wild * 2
+    N_mutant = N_mutant * 2
+    
+    l = rpois(1, N_wild*alfa_g)
+    N_wild = N_wild - l
+    N_mutant = N_mutant + l
+    
+    if(is.na(i_resistance) & N_mutant > 0) {
+      i_resistance = i
+    }
+  }
+  if(is.na(i_resistance)) {
+    i_resistance = g + 1
+  }
+  return(c(m=N_mutant, gained_res=i_resistance))
+}
+
+COLONIES_COUNT = 30000
+C = COLONIES_COUNT
+
+m_vals = c()
+
+
+for (i in 1:C) {
+  m_vals <- append(m_vals, 
+                   symulacja_hodowli(200, 0, 1*10^(-9), 21)["m"])
+}
+
+previous_max = -1
+breaks=c(0,1,2,3,4,5,10,20,50,100,200,500)
+
+counts = c()
+ranges = c()
+
+counts_pois = c()
+
+for (b in breaks) {
+  
+  counts = append(counts, length(m_vals[m_vals > previous_max & m_vals <=b]))
+  if(b - previous_max == 1) {
+    ranges = append(ranges, sprintf("%i", b))
+  } else {
+    ranges = append(ranges, sprintf("%i-%i", previous_max+1, b))
+  }
+  
+  previous_max = b
+  
+}
+mock_group = seq.int(1,1,length.out = length(ranges))
+
+ranges <- factor(ranges,levels = ranges)
+counts <- data.frame(probability = counts / C, 
+                     range_vals = ranges)
+
+ggplot(counts, aes(x=range_vals, group=mock_group)) + 
+  geom_point(mapping = aes(y=probability)) +
+  geom_line(linetype = "dashed", mapping = aes(y=probability)) +
+  theme_minimal() +
+  labs(title="Rozkład wynikający z modelu Lurii-Delbrücka") +
+  xlab("Ilość kolonii") +
+  ylab("Prawdopodobieństwo")
+
+```
+
+Zaimplementowaliśmy model z parametrem alfa_g mniejszym o połowę, w ten sposób uzyskaliśmy wnik znacznie bliższy do tego na prezentacji.

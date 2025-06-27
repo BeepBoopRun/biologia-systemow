@@ -3,7 +3,22 @@ title: "Zadania Glukoza"
 author: "Wiktor Rorat, Kinga Kurowska"
 format: 
   html:
-    embed-resources: true
+      df-print: paged
+# print df as tables https://quarto.org/docs/computations/r.html#data-frames
+      tidy: false
+      embed-resources: true
+      theme: lumen
+      toc: true
+      toc-location: left
+      toc-depth: 6
+      toc-expand: 6
+      code-tools:
+          source: true
+          toggle: true
+      code-fold: false
+      code-summary: "Show the code"
+      code-overflow: wrap
+      page-layout: full
 editor: visual
 ---
 
